@@ -19,3 +19,7 @@ message EventRequest {
     required uint32 delay = 2;
 }
 
+message FakeMessage {
+    enum Type { REQUEST = 1;}
+    required Type type = 1;
+}

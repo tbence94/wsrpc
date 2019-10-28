@@ -9,7 +9,7 @@ import * as crypto from 'crypto'
 import {Server, Client} from './../src'
 import * as wsrpc_client from './../src/client'
 import {waitForEvent, getFullName, lookupServices} from './../src/utils'
-import {TestService, TextMessage} from './../protocol/test'
+import {TestService, TextMessage, FakeMessage} from './../protocol/test'
 import { testNamespaceWithSameMethods } from './../protocol/test-package'
 import * as rpcproto from './../protocol/rpc'
 import * as WebSocket from 'ws'
@@ -184,6 +184,55 @@ describe('rpc', () => {
         }
     })
 
+    it('request handler should throw if missing request type', async function() {
+        // @ts-ignore
+        const method: protobuf.Method = server.root.lookup('TestService.Echo')
+        const originalRequestType = method.resolvedRequestType
+        method.resolvedRequestType = null
+
+        try {
+            // @ts-ignore
+            await client.service('TestService').echo({text: 'something'})
+        } catch (error) {
+            assert.equal(error.name, 'RPCError')
+            assert.equal(error.jse_shortmsg, 'Unable to resolve method types')
+            assert.equal(error.message, 'Unable to resolve method types')
+            method.resolvedRequestType = originalRequestType
+        }
+    })
+
+    it('request handler should throw if missing response type', async function() {
+        // @ts-ignore
+        const method: protobuf.Method = server.root.lookup('TestService.Echo')
+        const originalResponseType = method.resolvedResponseType
+        method.resolvedResponseType = null
+
+        try {
+            // @ts-ignore
+            await client.service('TestService').echo({text: 'something'})
+        } catch (error) {
+            assert.equal(error.name, 'RPCError')
+            assert.equal(error.jse_shortmsg, 'Unable to resolve method types')
+            assert.equal(error.message, 'Unable to resolve method types')
+            method.resolvedResponseType = originalResponseType
+        }
+    })
+
+    it('should handle message without a request object', function(done) {
+        const c = client as any
+        const msg = FakeMessage.encode({
+            type: FakeMessage.Type.REQUEST,
+        }).finish()
+
+        server.once('error', (error: any) => {
+            assert.equal(error.name, 'ConnectionError')
+            assert.equal(error.jse_cause.message, 'could not decode message: Message request missing')
+            done()
+        })
+
+        c.socket.send(msg)
+    })
+
     it('should handle bogus request message', function(done) {
         const c = client as any
         const msg = rpcproto.Message.encode({
@@ -331,6 +380,48 @@ describe('rpc', () => {
             assert.equal(error.message, 'boom')
         }
     })
+
+    it('should catch server errors', async function(done) {
+        planError = true
+        server.once('error', (error: any) => {
+            assert.equal(error.name, 'WebSocketError')
+            assert.equal(error.jse_shortmsg, 'server error')
+            assert.equal(error.message, 'server error: stuff happened in websocket server...')
+            done()
+        })
+        server.server.emit('error', new Error('stuff happened in websocket server...'))
+    })
+
+    it('should catch socket errors', async function(done) {
+        const connection = server.connections[0]
+
+        server.once('error', (error: any) => {
+            assert.equal(error.name, 'ConnectionError')
+            assert.equal(error.jse_shortmsg, 'connection error')
+            assert.equal(error.message, 'connection error: socket error...')
+            done()
+        })
+        connection.socket.emit('error', new Error('socket error...'))
+    })
+
+    // FIX CODE! REAL ERROR! Promise.all socket rejection not handled!
+    // it('should reject when socket.send fails', async function(done) {
+    //     const connection = server.connections[0]
+    //     const originalSend = connection.socket.send
+    //     connection.socket.send = (message: any, cb: any) => {
+    //         cb(new Error('sending failed...'))
+    //     }
+    //
+    //     server.once('error', (error: any) => {
+    //         console.log('AAAAAAAAAAAAAAAAAAAAAAAAAAA', error)
+    //         // assert.equal(error.name, 'ConnectionError')
+    //         // assert.equal(error.jse_shortmsg, 'connection error')
+    //         // assert.equal(error.message, 'connection error: socket error...')
+    //         connection.socket.send = originalSend
+    //         done()
+    //     })
+    //     server.broadcast('randomEvent', TextMessage.encode({text: 'testing fail'}).finish())
+    // })
 
     it('should close server', async function() {
         server.close()

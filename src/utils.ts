@@ -77,6 +77,10 @@ export function lookupServices(obj: Namespace | Service): string[] {
         return [getFullName(obj)]
     }
 
+    if (!obj.nestedArray) {
+        return [] // for Enum and Type values in orphan message types
+    }
+
     const services: string[] = []
 
     obj.nestedArray.forEach((nestedObject: Namespace) => {
