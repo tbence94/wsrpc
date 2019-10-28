@@ -341,6 +341,10 @@ describe('rpc', () => {
         assert(response.text, 'baz')
     })
 
+    it('should ignore double reconnect', async function() {
+        await client.connect()
+    })
+
     it('should handle server disconnection', async function() {
         this.slow(300)
         const c = client as any
