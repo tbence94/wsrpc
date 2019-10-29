@@ -513,4 +513,22 @@ describe('rpc browser client', function() {
         const response = await client.service('TestService').echo({text: 'foo'})
         assert.equal(response.text, 'foo')
     })
+
+    it('should throw when trying to write without socket', async function() {
+        this.slow(300)
+        const c = client as any
+        const originalSocket = c.socket
+        const originalIsConnected = c.isConnected
+        c.socket = undefined
+        c.isConnected = () => true
+
+        try {
+            // @ts-ignore
+            const response = await c.service('TestService').echo({text: 'fail write...'})
+        } catch (error) {
+            assert.equal(error.message, 'No socket')
+            c.socket = originalSocket
+            c.isConnected = originalIsConnected
+        }
+    })
 })
