@@ -362,6 +362,26 @@ describe('rpc', () => {
         assert.deepEqual(response.map((msg) => msg.text), ['fizz', 'buzz'])
     })
 
+    it('should handle failed writes', async function() {
+        this.slow(300)
+        const c = client as any
+        c.sendTimeout = 1000
+        const originalWrite = c.writeMessage
+        c.writeMessage = () => { throw new Error('Failed to write message...') }
+
+        assert.equal(server.connections.length, 1)
+        server.connections[0].close()
+        await waitForEvent(client, 'close')
+
+        try {
+            // @ts-ignore
+            const response = await client.service('TestService').echo({text: 'fail write...'})
+        } catch (error) {
+            assert.equal(error.message, 'Failed to write message...')
+            c.writeMessage = originalWrite
+        }
+    })
+
     it('should retry', async function() {
         this.slow(300)
         server.close()
