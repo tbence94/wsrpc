@@ -6,6 +6,7 @@ import * as assert from 'assert'
 
 import * as path from 'path'
 import * as crypto from 'crypto'
+import { ancestorWhere } from 'tslint'
 import {Server, Client} from './../src'
 import * as wsrpc_client from './../src/client'
 import {waitForEvent, getFullName, lookupServices} from './../src/utils'
@@ -92,9 +93,14 @@ describe('rpc', () => {
 
     const client = new Client(testAddr, testProto, {
         sendTimeout: 100,
+        autoConnect: true,
         eventTypes: {
             'text': TextMessage
         }
+    })
+
+    let clientWithoutAutoConnect = new Client(testAddr, testProto, {
+        autoConnect: false
     })
 
     client.on('error', (error: Error) => {
@@ -116,6 +122,15 @@ describe('rpc', () => {
             const orphanMethod = new protobuf.Method('Keke', 'foo', 'bar', 'baz')
             server.implement(orphanMethod, async () => { return {}})
         })
+    })
+
+    it('client without autoConnect should connect manually', async function() {
+        assert.equal(clientWithoutAutoConnect.isConnected(), false)
+        await clientWithoutAutoConnect.connect()
+        assert.equal(clientWithoutAutoConnect.isConnected(), true)
+        // Clean up connection...
+        await clientWithoutAutoConnect.disconnect()
+        assert.equal(clientWithoutAutoConnect.isConnected(), false)
     })
 
     it('should run echo rpc method', async function() {
