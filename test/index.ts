@@ -377,6 +377,24 @@ describe('rpc', () => {
         assert.deepEqual(response.map((msg) => msg.text), ['fizz', 'buzz'])
     })
 
+    it('should throw when trying to write without socket', async function() {
+        this.slow(300)
+        const c = client as any
+        const originalSocket = c.socket
+        const originalIsConnected = c.isConnected
+        c.socket = undefined
+        c.isConnected = () => true
+
+        try {
+            // @ts-ignore
+            const response = await c.service('TestService').echo({text: 'fail write...'})
+        } catch (error) {
+            assert.equal(error.message, 'No socket')
+            c.socket = originalSocket
+            c.isConnected = originalIsConnected
+        }
+    })
+
     it('should handle failed writes', async function() {
         this.slow(300)
         const c = client as any
