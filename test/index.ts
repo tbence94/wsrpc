@@ -303,6 +303,38 @@ describe('rpc', () => {
         })
     })
 
+    it('should handle missing response data from server', function(done) {
+        assert.equal(server.connections.length, 1)
+        const conn = server.connections[0] as any
+
+        const msg = rpcproto.Message.encode({
+            type: rpcproto.Message.Type.RESPONSE,
+        }).finish()
+
+        conn.socket.send(msg)
+        client.once('error', (error: any) => {
+            assert.equal(error.name, 'MessageError')
+            assert.equal(error.jse_cause.message, 'Response data missing')
+            done()
+        })
+    })
+
+    it('should handle missing event data from server', function(done) {
+        assert.equal(server.connections.length, 1)
+        const conn = server.connections[0] as any
+
+        const msg = rpcproto.Message.encode({
+            type: rpcproto.Message.Type.EVENT,
+        }).finish()
+
+        conn.socket.send(msg)
+        client.once('error', (error: any) => {
+            assert.equal(error.name, 'MessageError')
+            assert.equal(error.jse_cause.message, 'Event data missing')
+            done()
+        })
+    })
+
     it('should emit event', function(done) {
         planError = false
         assert.equal(server.connections.length, 1)
@@ -412,6 +444,23 @@ describe('rpc', () => {
         } catch (error) {
             assert.equal(error.message, 'Failed to write message...')
             c.writeMessage = originalWrite
+        }
+    })
+
+    it('should handle socket.send error', async function() {
+        const c = client as any
+        const originalSend = c.socket.send
+        c.socket.send = (message: any, cb: any) => {
+            cb(new Error('socket.send callback got error'))
+        }
+
+        try {
+            // @ts-ignore
+            await client.service('TestService').echo({text: 'boom'})
+            assert(false, 'should not be reached')
+        } catch (error) {
+            assert.equal(error.message, 'socket.send callback got error')
+            c.socket.send = originalSend
         }
     })
 
