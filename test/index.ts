@@ -428,24 +428,21 @@ describe('rpc', () => {
         connection.socket.emit('error', new Error('socket error...'))
     })
 
-    // FIX CODE! REAL ERROR! Promise.all socket rejection not handled!
-    // it('should reject when socket.send fails', async function(done) {
-    //     const connection = server.connections[0]
-    //     const originalSend = connection.socket.send
-    //     connection.socket.send = (message: any, cb: any) => {
-    //         cb(new Error('sending failed...'))
-    //     }
-    //
-    //     server.once('error', (error: any) => {
-    //         console.log('AAAAAAAAAAAAAAAAAAAAAAAAAAA', error)
-    //         // assert.equal(error.name, 'ConnectionError')
-    //         // assert.equal(error.jse_shortmsg, 'connection error')
-    //         // assert.equal(error.message, 'connection error: socket error...')
-    //         connection.socket.send = originalSend
-    //         done()
-    //     })
-    //     server.broadcast('randomEvent', TextMessage.encode({text: 'testing fail'}).finish())
-    // })
+    it('should reject when connection.socket.send fails', async function() {
+        const connection = server.connections[0]
+        const originalSend = connection.socket.send
+        connection.socket.send = (message: any, cb: any) => {
+            cb(new Error('sending failed...'))
+        }
+
+        try {
+            await server.broadcast('randomEvent', TextMessage.encode({text: 'testing fail'}).finish())
+            assert(false, 'should not be reached')
+        } catch (error) {
+            assert.equal(error.message, 'sending failed...')
+            connection.socket.send = originalSend
+        }
+    })
 
     it('should close server', async function() {
         server.close()
